@@ -1,0 +1,23 @@
+{
+  "appId": "com.rpgtodo.app",
+  "appName": "RPG Todo",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1800,
+      "backgroundColor": "#6C63FF",
+      "showSpinner": false,
+      "androidScaleType": "CENTER_CROP",
+      "splashFullScreen": true,
+      "splashImmersive": true,
+      "androidSplashResourceName": "splash",
+      "androidTheme": "@style/AppTheme"
+    }
+  },
+  "android": {
+    "allowMixedContent": true,
+    "captureInputKeyboard": true,
+    "webContentsDebuggingEnabled": false
+  }
+}

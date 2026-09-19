@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#6C63FF" />
+    <title>RPG Todo</title>
+    <link rel="icon" type="image/png" href="assets/favicon.png" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body class="theme-light">
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-block">
+          <div class="brand-icon">✓</div>
+          <div class="brand-copy">
+            <span class="eyebrow">Quest Log</span>
+            <h1>RPG Todo</h1>
+          </div>
+        </div>
+        <button id="themeButton" class="icon-button" type="button" aria-label="Toggle theme">🌙</button>
+      </header>
+
+      <main class="app-content">
+        <section id="homeView" class="screen active">
+          <div class="dashboard-card hero-card">
+            <div>
+              <p id="welcomeText" class="welcome-text">Good Morning 👋</p>
+              <h2 id="todayDate">Thursday, September 17, 2026</h2>
+            </div>
+          </div>
+
+          <div class="stats-grid">
+            <article class="stat-card">
+              <span class="stat-label">Total</span>
+              <strong id="totalTasksStat">0</strong>
+            </article>
+            <article class="stat-card">
+              <span class="stat-label">Completed</span>
+              <strong id="completedTasksStat">0</strong>
+            </article>
+            <article class="stat-card">
+              <span class="stat-label">Pending</span>
+              <strong id="pendingTasksStat">0</strong>
+            </article>
+            <article class="stat-card accent-card">
+              <span class="stat-label">Progress</span>
+              <strong id="progressStat">0%</strong>
+            </article>
+          </div>
+
+          <div class="progress-panel">
+            <div class="progress-row">
+              <span>Daily Progress</span>
+              <span id="progressLabel">0%</span>
+            </div>
+            <div class="progress-track">
+              <span id="progressBar" class="progress-fill"></span>
+            </div>
+            <div id="streakBadge" class="streak-badge">🔥 0 Day Streak</div>
+          </div>
+
+          <div class="panel-block">
+            <div class="panel-heading">
+              <h3>Today's Tasks</h3>
+              <span id="todayTasksCount">0</span>
+            </div>
+            <div id="todayTasksList" class="stack-list"></div>
+          </div>
+
+          <div class="panel-block">
+            <div class="panel-heading">
+              <h3>Upcoming Tasks</h3>
+              <span id="upcomingTasksCount">0</span>
+            </div>
+            <div id="upcomingTasksList" class="stack-list"></div>
+          </div>
+        </section>
+
+        <section id="tasksView" class="screen">
+          <div class="toolbar-box">
+            <div class="search-box">
+              <span>🔍</span>
+              <input id="searchInput" type="search" placeholder="Search tasks..." aria-label="Search tasks" />
+            </div>
+          </div>
+
+          <div id="filterTabs" class="filter-tabs" aria-label="Task filters">
+            <button class="filter-chip active" data-filter="all" type="button">All</button>
+            <button class="filter-chip" data-filter="today" type="button">Today</button>
+            <button class="filter-chip" data-filter="upcoming" type="button">Upcoming</button>
+            <button class="filter-chip" data-filter="completed" type="button">Completed</button>
+            <button class="filter-chip" data-filter="high" type="button">High Priority</button>
+          </div>
+
+          <div id="taskList" class="task-list"></div>
+        </section>
+
+        <section id="completedView" class="screen">
+          <div class="panel-block top-space">
+            <div class="panel-heading">
+              <h3>Completed Quest Log</h3>
+              <span id="completedPanelCount">0</span>
+            </div>
+            <div id="completedTaskList" class="task-list compact"></div>
+          </div>
+        </section>
+
+        <section id="settingsView" class="screen">
+          <div class="settings-list">
+            <button class="settings-item" type="button" data-settings-action="theme-center">
+              <span>Appearance</span>
+              <strong>Theme Center</strong>
+            </button>
+            <button class="settings-item" type="button" data-settings-action="reminder-settings">
+              <span>Notifications</span>
+              <strong>Reminder Settings</strong>
+            </button>
+            <button class="settings-item" type="button" data-settings-action="default-priority">
+              <span>Tasks</span>
+              <strong>Default Priority</strong>
+            </button>
+            <button class="settings-item" type="button" data-settings-action="default-category">
+              <span>Tasks</span>
+              <strong>Default Category</strong>
+            </button>
+            <button class="settings-item" type="button" data-settings-action="export-tasks">
+              <span>Data</span>
+              <strong>Export Tasks</strong>
+            </button>
+            <button class="settings-item" type="button" data-settings-action="import-tasks">
+              <span>Data</span>
+              <strong>Import Tasks</strong>
+            </button>
+            <button class="settings-item danger" type="button" data-settings-action="clear-tasks">
+              <span>Data</span>
+              <strong>Clear All Tasks</strong>
+            </button>
+            <button class="settings-item" type="button" data-settings-action="app-version">
+              <span>About</span>
+              <strong>App Version</strong>
+            </button>
+            <button class="settings-item" type="button" data-settings-action="about-rpg">
+              <span>About</span>
+              <strong>About RPG Todo</strong>
+            </button>
+          </div>
+
+          <div id="settingsDetail" class="settings-detail"></div>
+        </section>
+      </main>
+
+      <nav class="bottom-nav" aria-label="Main navigation">
+        <button class="nav-item active" data-nav="home" type="button">
+          <span>🏠</span>
+          <small>Home</small>
+        </button>
+        <button class="nav-item" data-nav="tasks" type="button">
+          <span>📋</span>
+          <small>Tasks</small>
+        </button>
+        <button class="nav-item add-button" data-nav="add" type="button" aria-label="Add task">
+          <span>➕</span>
+          <small>Add</small>
+        </button>
+        <button class="nav-item" data-nav="completed" type="button">
+          <span>✅</span>
+          <small>Completed</small>
+        </button>
+        <button class="nav-item" data-nav="settings" type="button">
+          <span>⚙️</span>
+          <small>Settings</small>
+        </button>
+      </nav>
+    </div>
+
+    <div id="taskModal" class="modal hidden" aria-hidden="true">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 id="taskModalTitle">Add Task</h3>
+          <button class="icon-button" type="button" data-close-modal="taskModal" aria-label="Close task modal">✕</button>
+        </div>
+
+        <form id="taskForm">
+          <input type="hidden" id="taskId" />
+
+          <div class="field-group">
+            <label for="taskTitle">Title</label>
+            <input id="taskTitle" name="title" type="text" maxlength="120" required />
+          </div>
+
+          <div class="field-group">
+            <label for="taskDescription">Description</label>
+            <textarea id="taskDescription" name="description" rows="3" placeholder="Optional notes..."></textarea>
+          </div>
+
+          <div class="field-row two-col">
+            <div class="field-group">
+              <label for="taskDueDate">Due Date</label>
+              <input id="taskDueDate" name="dueDate" type="date" />
+            </div>
+            <div class="field-group">
+              <label for="taskDueTime">Due Time</label>
+              <input id="taskDueTime" name="dueTime" type="time" />
+            </div>
+          </div>
+
+          <div class="field-row two-col">
+            <div class="field-group">
+              <label for="taskPriority">Priority</label>
+              <select id="taskPriority" name="priority">
+                <option value="Low">Low</option>
+                <option value="Medium" selected>Medium</option>
+                <option value="High">High</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label for="taskCategory">Category</label>
+              <select id="taskCategory" name="category"></select>
+            </div>
+          </div>
+
+          <div class="toggle-row">
+            <label for="taskReminderEnabled">🔔 Reminder</label>
+            <label class="switch">
+              <input id="taskReminderEnabled" type="checkbox" />
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="field-group reminder-field">
+            <label for="taskReminderDateTime">Reminder Date &amp; Time</label>
+            <input id="taskReminderDateTime" name="reminderDateTime" type="datetime-local" />
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="secondary-btn" data-close-modal="taskModal">Cancel</button>
+            <button type="submit" class="primary-btn">Save Task</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="detailsModal" class="modal hidden" aria-hidden="true">
+      <div class="modal-card details-card">
+        <div class="modal-header">
+          <h3>Task Details</h3>
+          <button class="icon-button" type="button" data-close-modal="detailsModal" aria-label="Close details modal">✕</button>
+        </div>
+        <div id="taskDetailsContent" class="details-content"></div>
+      </div>
+    </div>
+
+    <template id="taskCardTemplate">
+      <article class="task-card">
+        <div class="task-main">
+          <button class="complete-toggle" type="button" aria-label="Toggle completion">✓</button>
+          <div class="task-copy">
+            <div class="task-row">
+              <h4 class="task-title"></h4>
+              <span class="priority-badge"></span>
+            </div>
+            <p class="task-description"></p>
+            <div class="task-meta">
+              <span class="meta-tag due-tag"></span>
+              <span class="meta-tag category-tag"></span>
+            </div>
+          </div>
+        </div>
+        <div class="task-actions">
+          <button class="mini-button view-button" type="button">View</button>
+          <button class="mini-button edit-button" type="button">Edit</button>
+          <button class="mini-button delete-button" type="button">Delete</button>
+        </div>
+      </article>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>

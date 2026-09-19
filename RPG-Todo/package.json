@@ -1,0 +1,23 @@
+{
+  "name": "rpg-todo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "RPG Todo offline productivity app built with HTML, CSS, JavaScript, and Capacitor.",
+  "scripts": {
+    "start": "npx serve -s www -l 8080",
+    "dev": "npx serve -s www -l 8080",
+    "build": "npx cap sync android",
+    "cap:sync": "npx cap sync android",
+    "cap:open": "npx cap open android",
+    "android:generate": "npx @capacitor/assets generate --android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.2.1",
+    "@capacitor/cli": "^7.2.1",
+    "@capacitor/core": "^7.2.1",
+    "@capacitor/splash-screen": "^7.0.0"
+  },
+  "devDependencies": {
+    "serve": "^14.2.1"
+  }
+}
