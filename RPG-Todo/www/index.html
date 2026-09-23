@@ -2,10 +2,19 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="theme-color" content="#6C63FF" />
+    <meta name="description" content="RPG Todo - offline productivity app for study, work, and daily quests." />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="RPG Todo" />
     <title>RPG Todo</title>
-    <link rel="icon" type="image/png" href="assets/favicon.png" />
+    <link rel="manifest" href="manifest.json" />
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="assets/icon-512.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png" />
     <link rel="stylesheet" href="style.css" />
   </head>
   <body class="theme-light">
@@ -18,8 +27,22 @@
             <h1>RPG Todo</h1>
           </div>
         </div>
-        <button id="themeButton" class="icon-button" type="button" aria-label="Toggle theme">🌙</button>
+        <div class="topbar-actions">
+          <span id="connectionStatus" class="connection-pill" aria-live="polite" hidden></span>
+          <button id="themeButton" class="icon-button" type="button" aria-label="Toggle theme">🌙</button>
+        </div>
       </header>
+
+      <div id="installBanner" class="install-banner" role="region" aria-label="Install app" hidden>
+        <div class="install-copy">
+          <strong>Install RPG Todo</strong>
+          <span>Add to your home screen for a full app experience.</span>
+        </div>
+        <div class="install-actions">
+          <button id="installAppButton" class="primary-btn compact" type="button">Install</button>
+          <button id="dismissInstallBanner" class="secondary-btn compact" type="button" aria-label="Dismiss">✕</button>
+        </div>
+      </div>
 
       <main class="app-content">
         <section id="homeView" class="screen active">
@@ -85,12 +108,13 @@
             </div>
           </div>
 
-          <div id="filterTabs" class="filter-tabs" aria-label="Task filters">
-            <button class="filter-chip active" data-filter="all" type="button">All</button>
-            <button class="filter-chip" data-filter="today" type="button">Today</button>
-            <button class="filter-chip" data-filter="upcoming" type="button">Upcoming</button>
-            <button class="filter-chip" data-filter="completed" type="button">Completed</button>
-            <button class="filter-chip" data-filter="high" type="button">High Priority</button>
+          <div id="filterTabs" class="filter-tabs" role="tablist" aria-label="Task filters">
+            <button class="filter-chip active" data-filter="all" type="button" aria-pressed="true">All</button>
+            <button class="filter-chip" data-filter="today" type="button" aria-pressed="false">Today</button>
+            <button class="filter-chip" data-filter="upcoming" type="button" aria-pressed="false">Upcoming</button>
+            <button class="filter-chip" data-filter="overdue" type="button" aria-pressed="false">Overdue <span id="overdueCount" class="chip-count" hidden></span></button>
+            <button class="filter-chip" data-filter="completed" type="button" aria-pressed="false">Completed</button>
+            <button class="filter-chip" data-filter="high" type="button" aria-pressed="false">High Priority</button>
           </div>
 
           <div id="taskList" class="task-list"></div>
@@ -108,6 +132,10 @@
 
         <section id="settingsView" class="screen">
           <div class="settings-list">
+            <button class="settings-item" type="button" data-settings-action="install-app" id="installSettingItem" hidden>
+              <span>App</span>
+              <strong id="installSettingText">Install App</strong>
+            </button>
             <button class="settings-item" type="button" data-settings-action="theme-center">
               <span>Appearance</span>
               <strong>Theme Center</strong>
@@ -151,11 +179,11 @@
       </main>
 
       <nav class="bottom-nav" aria-label="Main navigation">
-        <button class="nav-item active" data-nav="home" type="button">
+        <button class="nav-item active" data-nav="home" type="button" aria-current="page">
           <span>🏠</span>
           <small>Home</small>
         </button>
-        <button class="nav-item" data-nav="tasks" type="button">
+        <button class="nav-item" data-nav="tasks" type="button" aria-current="false">
           <span>📋</span>
           <small>Tasks</small>
         </button>
@@ -163,18 +191,18 @@
           <span>➕</span>
           <small>Add</small>
         </button>
-        <button class="nav-item" data-nav="completed" type="button">
+        <button class="nav-item" data-nav="completed" type="button" aria-current="false">
           <span>✅</span>
           <small>Completed</small>
         </button>
-        <button class="nav-item" data-nav="settings" type="button">
+        <button class="nav-item" data-nav="settings" type="button" aria-current="false">
           <span>⚙️</span>
           <small>Settings</small>
         </button>
       </nav>
     </div>
 
-    <div id="taskModal" class="modal hidden" aria-hidden="true">
+    <div id="taskModal" class="modal hidden" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="taskModalTitle">
       <div class="modal-card">
         <div class="modal-header">
           <h3 id="taskModalTitle">Add Task</h3>
@@ -186,7 +214,8 @@
 
           <div class="field-group">
             <label for="taskTitle">Title</label>
-            <input id="taskTitle" name="title" type="text" maxlength="120" required />
+            <input id="taskTitle" name="title" type="text" maxlength="120" required autocomplete="off" />
+            <span id="titleError" class="field-error" role="alert" hidden></span>
           </div>
 
           <div class="field-group">
@@ -227,6 +256,7 @@
               <span class="slider"></span>
             </label>
           </div>
+          <p id="reminderNotice" class="notice-text" hidden></p>
 
           <div class="field-group reminder-field">
             <label for="taskReminderDateTime">Reminder Date &amp; Time</label>
@@ -235,21 +265,37 @@
 
           <div class="modal-actions">
             <button type="button" class="secondary-btn" data-close-modal="taskModal">Cancel</button>
-            <button type="submit" class="primary-btn">Save Task</button>
+            <button type="submit" class="primary-btn" id="saveTaskButton">Save Task</button>
           </div>
         </form>
       </div>
     </div>
 
-    <div id="detailsModal" class="modal hidden" aria-hidden="true">
+    <div id="detailsModal" class="modal hidden" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="detailsModalTitle">
       <div class="modal-card details-card">
         <div class="modal-header">
-          <h3>Task Details</h3>
+          <h3 id="detailsModalTitle">Task Details</h3>
           <button class="icon-button" type="button" data-close-modal="detailsModal" aria-label="Close details modal">✕</button>
         </div>
         <div id="taskDetailsContent" class="details-content"></div>
       </div>
     </div>
+
+    <div id="confirmModal" class="modal hidden" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
+      <div class="modal-card confirm-card">
+        <div class="modal-header">
+          <h3 id="confirmModalTitle">Confirm</h3>
+          <button class="icon-button" type="button" data-close-modal="confirmModal" aria-label="Close confirmation">✕</button>
+        </div>
+        <p id="confirmModalMessage" class="confirm-message"></p>
+        <div class="modal-actions">
+          <button type="button" class="secondary-btn" data-close-modal="confirmModal">Cancel</button>
+          <button type="button" class="primary-btn danger-btn" id="confirmModalAccept">Confirm</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="toastContainer" class="toast-container" aria-live="polite" aria-relevant="additions"></div>
 
     <template id="taskCardTemplate">
       <article class="task-card">
@@ -275,6 +321,9 @@
       </article>
     </template>
 
+    <script src="vendor/capacitor.js"></script>
+    <script src="vendor/capacitor-app.js"></script>
+    <script src="vendor/local-notifications.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

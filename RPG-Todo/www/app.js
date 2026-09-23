@@ -20,13 +20,22 @@ const defaultSettings = {
   appVersion: '1.0.0',
 };
 
+const priorities = ['Low', 'Medium', 'High'];
+
 let state = {
   tasks: [],
   activeNav: 'home',
   activeFilter: 'all',
   searchTerm: '',
   selectedTheme: 'theme-light',
-  settings: {...defaultSettings},
+  settings: { ...defaultSettings },
+  openModal: null,
+  deferredInstallPrompt: null,
+  savingTask: false,
+  lastFocusedElement: null,
+  modalOpenCount: 0,
+  suppressNextPop: false,
+  notifiedReminderIds: new Set(),
 };
 
 const ui = {
@@ -40,6 +49,7 @@ const ui = {
   searchInput: document.getElementById('searchInput'),
   taskModal: document.getElementById('taskModal'),
   detailsModal: document.getElementById('detailsModal'),
+  confirmModal: document.getElementById('confirmModal'),
   taskForm: document.getElementById('taskForm'),
   taskModalTitle: document.getElementById('taskModalTitle'),
   taskId: document.getElementById('taskId'),
@@ -51,6 +61,9 @@ const ui = {
   taskCategory: document.getElementById('taskCategory'),
   taskReminderEnabled: document.getElementById('taskReminderEnabled'),
   taskReminderDateTime: document.getElementById('taskReminderDateTime'),
+  saveTaskButton: document.getElementById('saveTaskButton'),
+  titleError: document.getElementById('titleError'),
+  reminderNotice: document.getElementById('reminderNotice'),
   settingsDetail: document.getElementById('settingsDetail'),
   welcomeText: document.getElementById('welcomeText'),
   todayDate: document.getElementById('todayDate'),
@@ -65,6 +78,17 @@ const ui = {
   completedPanelCount: document.getElementById('completedPanelCount'),
   todayTasksCount: document.getElementById('todayTasksCount'),
   upcomingTasksCount: document.getElementById('upcomingTasksCount'),
+  installBanner: document.getElementById('installBanner'),
+  installAppButton: document.getElementById('installAppButton'),
+  dismissInstallBanner: document.getElementById('dismissInstallBanner'),
+  installSettingItem: document.getElementById('installSettingItem'),
+  installSettingText: document.getElementById('installSettingText'),
+  connectionStatus: document.getElementById('connectionStatus'),
+  confirmModalMessage: document.getElementById('confirmModalMessage'),
+  confirmModalAccept: document.getElementById('confirmModalAccept'),
+  toastContainer: document.getElementById('toastContainer'),
+  overdueCount: document.getElementById('overdueCount'),
+  appShell: document.querySelector('.app-shell'),
 };
 
 const themeCycle = ['theme-light', 'theme-dark', 'theme-night', 'theme-blue', 'theme-sunset', 'theme-nature', 'theme-amoled'];
@@ -80,6 +104,13 @@ function initialize() {
   renderApp();
   setTodayDate();
   updateWelcomeGreeting();
+  registerServiceWorker();
+  initInstallPrompt();
+  initNativeBridge();
+  initConnectionStatus();
+  syncAllReminders();
+  startReminderWatcher();
+  initHistoryHandling();
 }
 
 function bindEvents() {
@@ -91,7 +122,11 @@ function bindEvents() {
   ui.filterTabs.forEach((button) => {
     button.addEventListener('click', () => {
       state.activeFilter = button.dataset.filter;
-      ui.filterTabs.forEach((chip) => chip.classList.toggle('active', chip === button));
+      ui.filterTabs.forEach((chip) => {
+        const isActive = chip === button;
+        chip.classList.toggle('active', isActive);
+        chip.setAttribute('aria-pressed', String(isActive));
+      });
       renderTaskList();
     });
   });
@@ -105,7 +140,11 @@ function bindEvents() {
       }
 
       state.activeNav = target;
-      ui.navItems.forEach((nav) => nav.classList.toggle('active', nav === button));
+      ui.navItems.forEach((nav) => {
+        const isActive = nav === button;
+        nav.classList.toggle('active', isActive);
+        nav.setAttribute('aria-current', isActive ? 'page' : 'false');
+      });
       renderScreens();
     });
   });
@@ -122,6 +161,7 @@ function bindEvents() {
   ui.taskReminderEnabled.addEventListener('change', () => {
     const isEnabled = ui.taskReminderEnabled.checked;
     document.querySelector('.reminder-field').classList.toggle('hidden', !isEnabled);
+    updateReminderNotice();
   });
 
   ui.themeButton.addEventListener('click', () => {
@@ -132,7 +172,55 @@ function bindEvents() {
     button.addEventListener('click', handleSettingsAction);
   });
 
+  ui.installAppButton.addEventListener('click', handleInstallClick);
+  ui.dismissInstallBanner.addEventListener('click', () => {
+    ui.installBanner.hidden = true;
+  });
+
+  ui.confirmModalAccept.addEventListener('click', () => {
+    hideModal('confirmModal');
+    if (typeof state.confirmAction === 'function') {
+      state.confirmAction();
+      state.confirmAction = null;
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && state.openModal) {
+      hideModal(state.openModal);
+      return;
+    }
+
+    if (event.key === 'Tab' && state.openModal) {
+      const container = document.getElementById(state.openModal);
+      if (!container || !container.contains(document.activeElement)) {
+        return;
+      }
+      const focusables = Array.from(
+        container.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')
+      ).filter((el) => !el.disabled && el.offsetParent !== null);
+      if (!focusables.length) {
+        return;
+      }
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+  });
+
   document.addEventListener('click', (event) => {
+    const modal = event.target.closest('.modal');
+    if (modal && event.target === modal && state.openModal === modal.id) {
+      hideModal(modal.id);
+    }
+
     const target = event.target.closest('[data-action="toggle-task"]');
     if (target) {
       const taskId = target.dataset.id;
@@ -159,7 +247,7 @@ function bindEvents() {
     if (deleteButton) {
       const card = deleteButton.closest('.task-card');
       if (card) {
-        deleteTask(card.dataset.taskId);
+        requestDeleteTask(card.dataset.taskId);
       }
     }
 
@@ -176,14 +264,18 @@ function bindEvents() {
 function loadTasks() {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.tasks);
-    state.tasks = raw ? JSON.parse(raw) : [];
+    state.tasks = raw ? sanitizeTasks(JSON.parse(raw)) : [];
   } catch (error) {
     state.tasks = [];
   }
 }
 
 function saveTasks() {
-  localStorage.setItem(STORAGE_KEYS.tasks, JSON.stringify(state.tasks));
+  try {
+    localStorage.setItem(STORAGE_KEYS.tasks, JSON.stringify(state.tasks));
+  } catch (error) {
+    showToast('Unable to save tasks. Storage may be full.', 'error');
+  }
 }
 
 function loadSettings() {
@@ -204,6 +296,35 @@ function saveTheme() {
 
 function saveSettings() {
   localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(state.settings));
+}
+
+function sanitizeTasks(tasks) {
+  if (!Array.isArray(tasks)) {
+    return [];
+  }
+
+  return tasks
+    .map((task) => {
+      if (!task || typeof task !== 'object') {
+        return null;
+      }
+      return {
+        id: String(task.id || createId()),
+        title: String(task.title || '').trim().slice(0, 120),
+        description: String(task.description || ''),
+        dueDate: String(task.dueDate || ''),
+        dueTime: String(task.dueTime || ''),
+        priority: priorities.includes(task.priority) ? task.priority : 'Medium',
+        category: String(task.category || '📌 Other'),
+        reminderEnabled: Boolean(task.reminderEnabled),
+        reminderDateTime: String(task.reminderDateTime || ''),
+        completed: Boolean(task.completed),
+        completedAt: task.completedAt || null,
+        createdAt: task.createdAt || new Date().toISOString(),
+        updatedAt: task.updatedAt || new Date().toISOString(),
+      };
+    })
+    .filter(Boolean);
 }
 
 function hydrateCategorySelect() {
@@ -287,6 +408,10 @@ function renderStats() {
   ui.upcomingTasksCount.textContent = upcomingCount;
   ui.completedPanelCount.textContent = completed;
 
+  const overdueCount = state.tasks.filter((task) => isOverdue(task)).length;
+  ui.overdueCount.textContent = overdueCount;
+  ui.overdueCount.hidden = overdueCount === 0;
+
   renderDailySummaryLists();
 }
 
@@ -313,17 +438,18 @@ function renderDailySummaryLists() {
 
 function renderSummaryTaskCard(task) {
   return `
-    <div class="task-card ${task.completed ? 'completed' : ''}" data-task-id="${task.id}">
+    <div class="task-card ${task.completed ? 'completed' : ''} ${isOverdue(task) ? 'overdue' : ''}" data-task-id="${escapeHtml(task.id)}">
       <div class="task-main">
-        <button class="complete-toggle" type="button" aria-label="Toggle completion">✓</button>
+        <button class="complete-toggle" type="button" aria-label="${task.completed ? 'Mark task incomplete' : 'Mark task complete'}" aria-pressed="${task.completed}">✓</button>
         <div class="task-copy">
           <div class="task-row">
             <h4 class="task-title">${escapeHtml(task.title)}</h4>
-            <span class="priority-badge priority-${task.priority.toLowerCase()}">${task.priority}</span>
+            <span class="priority-badge priority-${safePriorityClass(task.priority)}">${escapeHtml(task.priority)}</span>
           </div>
           <div class="task-meta">
-            <span class="meta-tag">${task.dueDate || 'No date'}</span>
-            <span class="meta-tag">${task.category}</span>
+            <span class="meta-tag">${escapeHtml(formatDate(task.dueDate))}</span>
+            <span class="meta-tag">${escapeHtml(task.category)}</span>
+            ${isOverdue(task) ? '<span class="meta-tag overdue-tag">Overdue</span>' : ''}
           </div>
         </div>
       </div>
@@ -343,18 +469,19 @@ function renderTaskList() {
     .map((task) => {
       const description = task.description ? `<p class="task-description">${escapeHtml(task.description)}</p>` : '';
       return `
-        <article class="task-card ${task.completed ? 'completed' : ''}" data-task-id="${task.id}">
+        <article class="task-card ${task.completed ? 'completed' : ''} ${isOverdue(task) ? 'overdue' : ''}" data-task-id="${escapeHtml(task.id)}">
           <div class="task-main">
-            <button class="complete-toggle" type="button" aria-label="Toggle completion">✓</button>
+            <button class="complete-toggle" type="button" aria-label="${task.completed ? 'Mark task incomplete' : 'Mark task complete'}" aria-pressed="${task.completed}">✓</button>
             <div class="task-copy">
               <div class="task-row">
                 <h4 class="task-title">${escapeHtml(task.title)}</h4>
-                <span class="priority-badge priority-${task.priority.toLowerCase()}">${task.priority}</span>
+                <span class="priority-badge priority-${safePriorityClass(task.priority)}">${escapeHtml(task.priority)}</span>
               </div>
               ${description}
               <div class="task-meta">
-                <span class="meta-tag due-tag">${task.dueDate ? formatDate(task.dueDate) : 'No date'}</span>
-                <span class="meta-tag category-tag">${task.category}</span>
+                <span class="meta-tag due-tag">${task.dueDate ? escapeHtml(formatDate(task.dueDate)) : 'No date'}</span>
+                <span class="meta-tag category-tag">${escapeHtml(task.category)}</span>
+                ${isOverdue(task) ? '<span class="meta-tag overdue-tag">Overdue</span>' : ''}
               </div>
             </div>
           </div>
@@ -381,18 +508,18 @@ function renderCompletedList() {
 
   ui.completedTaskList.innerHTML = completed
     .map((task) => `
-      <article class="task-card completed" data-task-id="${task.id}">
+      <article class="task-card completed" data-task-id="${escapeHtml(task.id)}">
         <div class="task-main">
-          <button class="complete-toggle" type="button" aria-label="Toggle completion">✓</button>
+          <button class="complete-toggle" type="button" aria-label="Mark task incomplete" aria-pressed="true">✓</button>
           <div class="task-copy">
             <div class="task-row">
               <h4 class="task-title">${escapeHtml(task.title)}</h4>
-              <span class="priority-badge priority-${task.priority.toLowerCase()}">${task.priority}</span>
+              <span class="priority-badge priority-${safePriorityClass(task.priority)}">${escapeHtml(task.priority)}</span>
             </div>
             <p class="task-description">${escapeHtml(task.description || 'No description')}</p>
             <div class="task-meta">
-              <span class="meta-tag">${task.dueDate ? formatDate(task.dueDate) : 'No date'}</span>
-              <span class="meta-tag">${task.category}</span>
+              <span class="meta-tag">${task.dueDate ? escapeHtml(formatDate(task.dueDate)) : 'No date'}</span>
+              <span class="meta-tag">${escapeHtml(task.category)}</span>
             </div>
           </div>
         </div>
@@ -404,6 +531,14 @@ function renderCompletedList() {
       </article>
     `)
     .join('');
+}
+
+function isOverdue(task) {
+  return Boolean(!task.completed && task.dueDate && task.dueDate < getLocalDateString(new Date()));
+}
+
+function safePriorityClass(priority) {
+  return priorities.includes(priority) ? priority.toLowerCase() : 'medium';
 }
 
 function getFilteredTasks() {
@@ -425,6 +560,8 @@ function getFilteredTasks() {
           return task.dueDate === today;
         case 'upcoming':
           return !task.completed && task.dueDate && task.dueDate > today;
+        case 'overdue':
+          return isOverdue(task);
         case 'completed':
           return task.completed;
         case 'high':
@@ -456,6 +593,7 @@ function sortTasks(a, b) {
 }
 
 function openTaskModal(taskId = null) {
+  ui.titleError.hidden = true;
   ui.taskForm.reset();
   ui.taskCategory.innerHTML = defaultCategories
     .map((category) => `<option value="${category}">${category}</option>`)
@@ -489,24 +627,45 @@ function openTaskModal(taskId = null) {
     ui.taskDescription.value = '';
     ui.taskDueDate.value = '';
     ui.taskDueTime.value = '';
+    ui.taskPriority.value = state.settings.defaultPriority || 'Medium';
     ui.taskReminderDateTime.value = '';
   }
 
+  updateReminderNotice();
   showModal('taskModal');
+  setTimeout(() => ui.taskTitle.focus(), 50);
 }
 
 function handleTaskSubmit(event) {
   event.preventDefault();
 
+  if (state.savingTask) {
+    return;
+  }
+
   const title = ui.taskTitle.value.trim();
   if (!title) {
+    ui.titleError.textContent = 'Please enter a task title.';
+    ui.titleError.hidden = false;
+    ui.taskTitle.focus();
+    return;
+  }
+  if (title.length > 120) {
+    ui.titleError.textContent = 'Title must be 120 characters or fewer.';
+    ui.titleError.hidden = false;
     ui.taskTitle.focus();
     return;
   }
 
   const id = ui.taskId.value || createId();
   const now = new Date().toISOString();
-  const reminderEnabled = ui.taskReminderEnabled.checked;
+  const reminderEnabled = ui.taskReminderEnabled.checked && state.settings.remindersEnabled;
+  const reminderDateTime = reminderEnabled && ui.taskReminderDateTime.value
+    ? ui.taskReminderDateTime.value
+    : '';
+
+  const existingIndex = state.tasks.findIndex((item) => item.id === id);
+  const isEditing = existingIndex >= 0;
 
   const task = {
     id,
@@ -517,19 +676,14 @@ function handleTaskSubmit(event) {
     priority: ui.taskPriority.value,
     category: ui.taskCategory.value,
     reminderEnabled,
-    reminderDateTime: reminderEnabled ? (ui.taskReminderDateTime.value || calculateReminderDateTime(ui.taskDueDate.value, ui.taskDueTime.value)) : '',
-    completed: false,
-    completedAt: null,
-    createdAt: existingTask(id)?.createdAt || now,
+    reminderDateTime: reminderDateTime || (reminderEnabled ? calculateReminderDateTime(ui.taskDueDate.value, ui.taskDueTime.value) : ''),
+    completed: isEditing ? state.tasks[existingIndex].completed : false,
+    completedAt: isEditing ? state.tasks[existingIndex].completedAt : null,
+    createdAt: isEditing ? state.tasks[existingIndex].createdAt : now,
     updatedAt: now,
   };
 
-  const existingIndex = state.tasks.findIndex((item) => item.id === id);
-  if (existingIndex >= 0) {
-    const current = state.tasks[existingIndex];
-    task.completed = current.completed;
-    task.completedAt = current.completedAt;
-    task.createdAt = current.createdAt;
+  if (isEditing) {
     state.tasks[existingIndex] = task;
   } else {
     state.tasks.push(task);
@@ -539,8 +693,13 @@ function handleTaskSubmit(event) {
   state.settings.defaultCategory = ui.taskCategory.value;
   saveSettings();
   saveTasks();
+
+  scheduleTaskReminder(task);
+
+  state.savingTask = false;
   hideModal('taskModal');
   renderApp();
+  showToast(isEditing ? 'Task updated.' : 'Task added.', 'success');
 }
 
 function existingTask(id) {
@@ -560,10 +719,25 @@ function calculateReminderDateTime(dateValue, timeValue) {
   return `${datePart}T${timePart}`;
 }
 
+function requestDeleteTask(taskId) {
+  const task = state.tasks.find((item) => item.id === taskId);
+  if (!task) {
+    return;
+  }
+
+  showConfirmDialog(
+    'Delete task?',
+    `Are you sure you want to delete "${task.title}"? This action cannot be undone.`,
+    () => deleteTask(taskId)
+  );
+}
+
 function deleteTask(taskId) {
   state.tasks = state.tasks.filter((task) => task.id !== taskId);
   saveTasks();
+  cancelTaskReminder(taskId);
   renderApp();
+  showToast('Task deleted.', 'neutral');
 }
 
 function toggleTaskCompletion(taskId) {
@@ -576,7 +750,15 @@ function toggleTaskCompletion(taskId) {
   task.completedAt = task.completed ? new Date().toISOString() : null;
   task.updatedAt = new Date().toISOString();
   saveTasks();
+
+  if (task.completed) {
+    cancelTaskReminder(taskId);
+  } else if (task.reminderEnabled && task.reminderDateTime) {
+    scheduleTaskReminder(task);
+  }
+
   renderApp();
+  showToast(task.completed ? 'Task completed. 🎉' : 'Task marked pending.', 'success');
 }
 
 function openTaskDetails(taskId) {
@@ -598,27 +780,27 @@ function openTaskDetails(taskId) {
     </div>
     <div class="detail-item">
       <span>Due Date</span>
-      <strong>${task.dueDate ? formatDate(task.dueDate) : 'No due date'}</strong>
+      <strong>${task.dueDate ? escapeHtml(formatDate(task.dueDate)) : 'No due date'}${isOverdue(task) ? ' — ⏰ Overdue' : ''}</strong>
     </div>
     <div class="detail-item">
       <span>Due Time</span>
-      <strong>${task.dueTime || 'No due time'}</strong>
+      <strong>${escapeHtml(task.dueTime || 'No due time')}</strong>
     </div>
     <div class="detail-item">
       <span>Priority</span>
-      <strong>${task.priority}</strong>
+      <strong>${escapeHtml(task.priority)}</strong>
     </div>
     <div class="detail-item">
       <span>Category</span>
-      <strong>${task.category}</strong>
+      <strong>${escapeHtml(task.category)}</strong>
     </div>
     <div class="detail-item">
       <span>Reminder</span>
-      <strong>${task.reminderEnabled ? `Enabled (${task.reminderDateTime || 'No date set'})` : 'Disabled'}</strong>
+      <strong>${task.reminderEnabled ? `Enabled (${escapeHtml(task.reminderDateTime || 'No date set')})` : 'Disabled'}</strong>
     </div>
     <div class="detail-item">
       <span>Created Date</span>
-      <strong>${task.createdAt ? new Date(task.createdAt).toLocaleString() : 'Unknown'}</strong>
+      <strong>${task.createdAt ? escapeHtml(new Date(task.createdAt).toLocaleString()) : 'Unknown'}</strong>
     </div>
     <div class="detail-item">
       <span>Completion Status</span>
@@ -634,6 +816,9 @@ function handleSettingsAction(event) {
   const detail = ui.settingsDetail;
 
   switch (action) {
+    case 'install-app':
+      handleInstallClick();
+      break;
     case 'theme-center':
       detail.classList.remove('hidden');
       detail.innerHTML = `
@@ -653,19 +838,26 @@ function handleSettingsAction(event) {
             <span class="slider"></span>
           </label>
         </div>
+        <p class="notice-text reminder-platform-note"></p>
         <div class="field-group">
-          <label for="defaultReminderTime">Default reminder time</label>
-          <input id="defaultReminderTime" type="number" min="5" max="1440" step="5" value="${state.settings.defaultReminderMinutes || 30}" />
+          <label for="defaultReminderTime">Default reminder time (minutes ahead)</label>
+          <input id="defaultReminderTime" type="number" min="5" max="1440" step="5" value="${escapeHtml(String(state.settings.defaultReminderMinutes || 30))}" />
         </div>
         <div class="modal-actions">
           <button type="button" class="primary-btn" id="saveReminderSettings">Save</button>
         </div>
       `;
-      document.getElementById('saveReminderSettings').addEventListener('click', () => {
+      document.querySelector('.reminder-platform-note').textContent = reminderPlatformNote();
+      document.getElementById('saveReminderSettings').addEventListener('click', async () => {
         state.settings.remindersEnabled = document.getElementById('reminderToggle').checked;
         state.settings.defaultReminderMinutes = Number(document.getElementById('defaultReminderTime').value || 30);
         saveSettings();
+        if (state.settings.remindersEnabled) {
+          await ensureNotificationPermission();
+        }
+        syncAllReminders();
         detail.classList.add('hidden');
+        showToast('Reminder settings saved.', 'success');
       });
       break;
     case 'default-priority':
@@ -687,6 +879,7 @@ function handleSettingsAction(event) {
         state.settings.defaultPriority = document.getElementById('defaultPriorityInput').value;
         saveSettings();
         detail.classList.add('hidden');
+        showToast('Default priority saved.', 'success');
       });
       break;
     case 'default-category':
@@ -706,6 +899,7 @@ function handleSettingsAction(event) {
         state.settings.defaultCategory = document.getElementById('defaultCategoryInput').value;
         saveSettings();
         detail.classList.add('hidden');
+        showToast('Default category saved.', 'success');
       });
       break;
     case 'export-tasks':
@@ -715,10 +909,20 @@ function handleSettingsAction(event) {
       importTasks();
       break;
     case 'clear-tasks':
-      if (confirm('Clear all tasks? This action cannot be undone.')) {
-        state.tasks = [];
-        saveTasks();
-        renderApp();
+      if (state.tasks.length) {
+        showConfirmDialog(
+          'Clear all tasks?',
+          'This will permanently delete all tasks. This action cannot be undone.',
+          () => {
+            state.tasks = [];
+            saveTasks();
+            clearAllReminders();
+            renderApp();
+            showToast('All tasks cleared.', 'neutral');
+          }
+        );
+      } else {
+        showToast('No tasks to clear.', 'neutral');
       }
       break;
     case 'app-version':
@@ -726,7 +930,7 @@ function handleSettingsAction(event) {
       detail.innerHTML = `
         <div class="detail-item">
           <span>App Version</span>
-          <strong>${state.settings.appVersion}</strong>
+          <strong>${escapeHtml(String(state.settings.appVersion || defaultSettings.appVersion))}</strong>
         </div>
       `;
       break;
@@ -758,7 +962,7 @@ function buildThemeOption(themeName) {
   const current = themeMap[themeName];
   const isSelected = state.selectedTheme === themeName;
   return `
-    <button class="theme-option ${isSelected ? 'selected' : ''}" type="button" data-theme-option="${themeName}">
+    <button class="theme-option ${isSelected ? 'selected' : ''}" type="button" data-theme-option="${themeName}" aria-pressed="${isSelected}">
       <div>
         <strong>${current.label}</strong>
         <small>${current.text}</small>
@@ -799,6 +1003,15 @@ function applyTheme(themeName) {
   document.body.classList.remove('theme-light', 'theme-dark', 'theme-night', 'theme-blue', 'theme-sunset', 'theme-nature', 'theme-amoled');
   document.body.classList.add(themeName);
 
+  const themeColor = themeName === 'theme-light' || themeName === 'theme-blue' || themeName === 'theme-sunset' || themeName === 'theme-nature'
+    ? '#6C63FF'
+    : '#101827';
+
+  const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+  if (themeColorMeta) {
+    themeColorMeta.setAttribute('content', themeColor);
+  }
+
   const themeIconMap = {
     'theme-light': '☀️',
     'theme-dark': '🌙',
@@ -829,13 +1042,14 @@ function exportTasks() {
   link.download = 'rpg-todo-tasks.json';
   link.click();
   URL.revokeObjectURL(url);
+  showToast('Tasks exported.', 'success');
 }
 
 function importTasks() {
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = 'application/json';
-  input.addEventListener('change', (event) => {
+  input.addEventListener('change', async (event) => {
     const file = event.target.files?.[0];
     if (!file) {
       return;
@@ -845,14 +1059,17 @@ function importTasks() {
     reader.onload = () => {
       try {
         const parsed = JSON.parse(String(reader.result));
-        if (!Array.isArray(parsed)) {
+        const cleaned = sanitizeTasks(parsed);
+        if (!Array.isArray(cleaned)) {
           throw new Error('Invalid task export');
         }
-        state.tasks = parsed;
+        state.tasks = cleaned;
         saveTasks();
+        syncAllReminders();
         renderApp();
+        showToast(`Imported ${cleaned.length} tasks.`, 'success');
       } catch (error) {
-        alert('Import failed. Please choose a valid RPG Todo JSON export.');
+        showToast('Import failed. Please choose a valid RPG Todo JSON export.', 'error');
       }
     };
     reader.readAsText(file);
@@ -860,22 +1077,442 @@ function importTasks() {
   input.click();
 }
 
+function showConfirmDialog(title, message, onConfirm) {
+  ui.confirmModalMessage.textContent = message;
+  document.getElementById('confirmModalTitle').textContent = title;
+  state.confirmAction = onConfirm;
+  showModal('confirmModal');
+}
+
 function showModal(modalId) {
   const modal = document.getElementById(modalId);
   if (!modal) {
     return;
   }
+  if (state.openModal && state.openModal !== modalId) {
+    hideModal(state.openModal);
+  }
+
+  state.openModal = modalId;
+  state.lastFocusedElement = document.activeElement;
   modal.classList.remove('hidden');
   modal.setAttribute('aria-hidden', 'false');
+
+  if (ui.appShell) {
+    ui.appShell.setAttribute('inert', '');
+  }
+
+  // Push a history entry so the browser/back button closes the modal instead of leaving the page.
+  if (typeof window.history.pushState === 'function' && !isNativePlatform()) {
+    state.modalOpenCount += 1;
+    window.history.pushState({ rpgTodoModal: modalId, count: state.modalOpenCount }, '');
+  }
+
+  trapFocus(modal);
 }
 
 function hideModal(modalId) {
   const modal = document.getElementById(modalId);
+  if (!modal || state.openModal !== modalId) {
+    return;
+  }
+
+  closeModalDirect(modalId);
+
+  // Pop the history entry this modal pushed, keeping back-button state consistent.
+  if (typeof window.history.back === 'function' && state.modalOpenCount > 0 && !isNativePlatform()) {
+    const popped = window.history.state && window.history.state.rpgTodoModal === modalId;
+    state.modalOpenCount -= 1;
+    if (popped) {
+      state.suppressNextPop = true;
+      window.history.back();
+    }
+  }
+}
+
+function closeModalDirect(modalId) {
+  const modal = document.getElementById(modalId);
   if (!modal) {
     return;
   }
+
   modal.classList.add('hidden');
   modal.setAttribute('aria-hidden', 'true');
+
+  if (ui.appShell) {
+    ui.appShell.removeAttribute('inert');
+  }
+
+  if (state.openModal === modalId) {
+    state.openModal = null;
+  }
+
+  if (state.lastFocusedElement && typeof state.lastFocusedElement.focus === 'function') {
+    state.lastFocusedElement.focus();
+    state.lastFocusedElement = null;
+  }
+}
+
+function trapFocus(container) {
+  const focusables = container.querySelectorAll(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  );
+  if (!focusables.length) {
+    if (container && container.focus) {
+      container.focus();
+    }
+    return;
+  }
+  if (document.activeElement === document.body || !container.contains(document.activeElement)) {
+    focusables[0].focus();
+  }
+}
+
+function initHistoryHandling() {
+  window.addEventListener('popstate', () => {
+    if (state.suppressNextPop) {
+      state.suppressNextPop = false;
+      return;
+    }
+    if (state.openModal && document.getElementById(state.openModal)) {
+      closeModalDirect(state.openModal);
+      return;
+    }
+    if (state.activeNav !== 'home') {
+      setActiveNav('home');
+    }
+  });
+}
+
+function showToast(message, type = 'neutral') {
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  ui.toastContainer.appendChild(toast);
+
+  requestAnimationFrame(() => toast.classList.add('show'));
+
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 300);
+  }, 2600);
+}
+
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) {
+    return;
+  }
+  const isNative = isNativePlatform();
+  if (isNative) {
+    return;
+  }
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register('sw.js')
+      .then((registration) => {
+        registration.update();
+      })
+      .catch((error) => {
+        console.error('Service worker registration failed:', error);
+      });
+  });
+}
+
+function initInstallPrompt() {
+  window.addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault();
+    state.deferredInstallPrompt = event;
+    ui.installSettingItem.hidden = false;
+    ui.installSettingText.textContent = 'Install App';
+    showInstallBannerIfWeb();
+  });
+
+  window.addEventListener('appinstalled', () => {
+    state.deferredInstallPrompt = null;
+    ui.installBanner.hidden = true;
+    ui.installSettingItem.hidden = true;
+    showToast('App installed. Find RPG Todo on your home screen.', 'success');
+  });
+
+  if (isIosSafari() && !window.navigator.standalone) {
+    ui.installSettingItem.hidden = false;
+    ui.installSettingText.textContent = 'How to Install';
+  }
+}
+
+function showInstallBannerIfWeb() {
+  const dismissed = localStorage.getItem('rpgTodoInstallDismissed');
+  if (dismissed !== '1' && !isNativePlatform() && !isStandalone()) {
+    ui.installBanner.hidden = false;
+  }
+}
+
+async function handleInstallClick() {
+  if (state.deferredInstallPrompt) {
+    state.deferredInstallPrompt.prompt();
+    await state.deferredInstallPrompt.userChoice;
+    state.deferredInstallPrompt = null;
+    ui.installBanner.hidden = true;
+    ui.installSettingItem.hidden = true;
+    return;
+  }
+
+  if (isIosSafari() && !isStandalone()) {
+    showConfirmDialog(
+      'Install on iPhone/iPad',
+      'Tap the Share button (square with arrow), then choose "Add to Home Screen". RPG Todo will appear like a native app on your home screen.'
+    );
+    return;
+  }
+
+  showToast('Install is available from your browser\u2019s menu (Add to Home Screen).', 'neutral');
+}
+
+function initNativeBridge() {
+  if (!isNativePlatform()) {
+    return;
+  }
+
+  const App = getCapacitorPlugin('App');
+  if (App && typeof App.addListener === 'function') {
+    App.addListener('backButton', () => {
+      if (state.openModal) {
+        hideModal(state.openModal);
+        return;
+      }
+      if (state.activeNav !== 'home') {
+        setActiveNav('home');
+        return;
+      }
+      if (App.exitApp && typeof App.exitApp === 'function') {
+        App.exitApp();
+      } else if (App.minimizeApp) {
+        App.minimizeApp();
+      }
+    });
+  }
+}
+
+function setActiveNav(target) {
+  state.activeNav = target;
+  ui.navItems.forEach((nav) => {
+    const isActive = nav.dataset.nav === target;
+    nav.classList.toggle('active', isActive);
+    nav.setAttribute('aria-current', isActive ? 'page' : 'false');
+  });
+  renderScreens();
+}
+
+function initConnectionStatus() {
+  const update = () => {
+    const isOffline = !navigator.onLine;
+    ui.connectionStatus.hidden = !isOffline;
+    if (isOffline) {
+      ui.connectionStatus.textContent = 'Offline — changes saved on device';
+    }
+  };
+
+  window.addEventListener('online', update);
+  window.addEventListener('offline', update);
+  update();
+}
+
+function isNativePlatform() {
+  return typeof window !== 'undefined' && typeof window.Capacitor !== 'undefined' && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform();
+}
+
+function isIosSafari() {
+  const ua = navigator.userAgent.toLowerCase();
+  const isIPhone = /iphone|ipad|ipod/.test(ua);
+  const isSafari = ua.includes('safari') && !ua.includes('crios') && !ua.includes('fxios');
+  return isIPhone && isSafari;
+}
+
+function isStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+}
+
+function getCapacitorPlugin(name) {
+  try {
+    if (!isNativePlatform() && name !== 'LocalNotifications') {
+      return null;
+    }
+    const plugins = window.Capacitor && window.Capacitor.Plugins;
+    return plugins && plugins[name] ? plugins[name] : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function reminderPlatformNote() {
+  if (isNativePlatform()) {
+    return 'Reminders are scheduled on this device and can ring even when the app is closed.';
+  }
+  return 'On this website, reminders show while the page is open. Reminders that ring when the app is closed are available in the installed Android app.';
+}
+
+function updateReminderNotice() {
+  if (!ui.reminderNotice) {
+    return;
+  }
+  const note = reminderPlatformNote();
+  if (!ui.taskReminderEnabled.checked) {
+    ui.reminderNotice.hidden = true;
+    return;
+  }
+  ui.reminderNotice.textContent = note;
+  ui.reminderNotice.hidden = false;
+}
+
+async function ensureNotificationPermission() {
+  const LocalNotifications = getCapacitorPlugin('LocalNotifications');
+  if (!LocalNotifications || typeof LocalNotifications.requestPermissions !== 'function') {
+    return;
+  }
+  try {
+    await LocalNotifications.requestPermissions();
+  } catch (error) {
+    // Permission denied or unsupported; reminders degrade gracefully.
+  }
+}
+
+function notificationIdFor(taskId) {
+  let hash = 0;
+  const str = String(taskId);
+  for (let i = 0; i < str.length; i += 1) {
+    hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash);
+}
+
+async function scheduleTaskReminder(task) {
+  if (!task || !task.reminderEnabled || !task.reminderDateTime) {
+    return;
+  }
+
+  const when = new Date(task.reminderDateTime);
+  if (Number.isNaN(when.getTime()) || when.getTime() <= Date.now()) {
+    return;
+  }
+
+  const LocalNotifications = getCapacitorPlugin('LocalNotifications');
+  if (!LocalNotifications || typeof LocalNotifications.schedule !== 'function') {
+    return;
+  }
+
+  try {
+    const permission = await LocalNotifications.checkPermissions();
+    if (permission.display !== 'granted' && permission.display !== 'prompt') {
+      return;
+    }
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: notificationIdFor(task.id),
+          title: 'RPG Todo Reminder',
+          body: task.title,
+          schedule: { at: when },
+          extra: { taskId: task.id },
+        },
+      ],
+    });
+  } catch (error) {
+    // Notification scheduling failed (e.g. permission denied). This is non-critical.
+  }
+}
+
+async function cancelTaskReminder(taskId) {
+  const LocalNotifications = getCapacitorPlugin('LocalNotifications');
+  if (!LocalNotifications || typeof LocalNotifications.cancel !== 'function') {
+    return;
+  }
+  try {
+    await LocalNotifications.cancel({ notifications: [{ id: notificationIdFor(taskId) }] });
+  } catch (error) {
+    // Best-effort cancellation.
+  }
+}
+
+async function clearAllReminders() {
+  const LocalNotifications = getCapacitorPlugin('LocalNotifications');
+  if (!LocalNotifications || typeof LocalNotifications.cancel !== 'function') {
+    return;
+  }
+  try {
+    const allPending = state.tasks.map((task) => ({ id: notificationIdFor(task.id) }));
+    if (allPending.length) {
+      await LocalNotifications.cancel({ notifications: allPending });
+    }
+  } catch (error) {
+    // Best-effort cancellation.
+  }
+}
+
+async function syncAllReminders() {
+  if (!isNativePlatform()) {
+    return;
+  }
+  const LocalNotifications = getCapacitorPlugin('LocalNotifications');
+  if (!LocalNotifications) {
+    return;
+  }
+
+  try {
+    const pendingResult = await LocalNotifications.getPending();
+    const pendingIds = (pendingResult.notifications || []).map((n) => n.id);
+    const keptIds = state.tasks
+      .filter((task) => task.reminderEnabled && task.reminderDateTime)
+      .map((task) => notificationIdFor(task.id));
+    const staleIds = pendingIds.filter((id) => !keptIds.includes(id));
+    if (staleIds.length) {
+      await LocalNotifications.cancel({ notifications: staleIds.map((id) => ({ id })) });
+    }
+  } catch (error) {
+    // Ignore sync errors; scheduling is best-effort per-task.
+  }
+
+  state.tasks.forEach((task) => scheduleTaskReminder(task));
+}
+
+function startReminderWatcher() {
+  checkDueReminders();
+  setInterval(checkDueReminders, 30000);
+}
+
+function checkDueReminders() {
+  const now = new Date();
+
+  state.tasks.forEach((task) => {
+    if (task.completed) {
+      return;
+    }
+
+    const reminderKey = `reminder-${task.id}`;
+    if (task.reminderEnabled && task.reminderDateTime && !state.notifiedReminderIds.has(reminderKey)) {
+      const when = new Date(task.reminderDateTime);
+      if (!Number.isNaN(when.getTime()) && when.getTime() <= now.getTime()) {
+        state.notifiedReminderIds.add(reminderKey);
+        showToast(`🔔 Reminder: ${task.title}`, 'success');
+        fireWebNotification('RPG Todo Reminder', task.title);
+      }
+    }
+
+    const overdueKey = `overdue-${task.id}`;
+    if (isOverdue(task) && !state.notifiedReminderIds.has(overdueKey)) {
+      state.notifiedReminderIds.add(overdueKey);
+      showToast(`⏰ Overdue: ${task.title}`, 'danger');
+    }
+  });
+}
+
+function fireWebNotification(title, body) {
+  try {
+    if ('Notification' in window && Notification.permission === 'granted' && isNativePlatform() === false) {
+      new Notification(title, { body, icon: 'assets/icon-192.png' });
+    }
+  } catch (error) {
+    // Web notifications are best-effort; toasts already cover the case.
+  }
 }
 
 function createId() {

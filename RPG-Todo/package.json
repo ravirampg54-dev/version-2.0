@@ -13,11 +13,14 @@
   },
   "dependencies": {
     "@capacitor/android": "^7.2.1",
+    "@capacitor/app": "^7.1.2",
     "@capacitor/cli": "^7.2.1",
     "@capacitor/core": "^7.2.1",
+    "@capacitor/local-notifications": "^7.0.7",
     "@capacitor/splash-screen": "^7.0.0"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "serve": "^14.2.1"
   }
 }
