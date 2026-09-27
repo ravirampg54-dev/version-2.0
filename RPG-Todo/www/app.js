@@ -4,6 +4,8 @@ const STORAGE_KEYS = {
   settings: 'rpgTodoSettings',
 };
 
+const INSTALL_DISMISSED_KEY = 'rpgTodoInstallDismissed';
+
 const defaultCategories = [
   '📚 Study',
   '🎓 College',
@@ -111,6 +113,7 @@ function initialize() {
   syncAllReminders();
   startReminderWatcher();
   initHistoryHandling();
+  handleLaunchParams();
 }
 
 function bindEvents() {
@@ -173,9 +176,7 @@ function bindEvents() {
   });
 
   ui.installAppButton.addEventListener('click', handleInstallClick);
-  ui.dismissInstallBanner.addEventListener('click', () => {
-    ui.installBanner.hidden = true;
-  });
+  ui.dismissInstallBanner.addEventListener('click', dismissInstallBanner);
 
   ui.confirmModalAccept.addEventListener('click', () => {
     hideModal('confirmModal');
@@ -1202,62 +1203,99 @@ function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) {
     return;
   }
-  const isNative = isNativePlatform();
-  if (isNative) {
+  if (isNativePlatform()) {
     return;
   }
-  window.addEventListener('load', () => {
-    navigator.serviceWorker
-      .register('sw.js')
-      .then((registration) => {
-        registration.update();
-      })
-      .catch((error) => {
-        console.error('Service worker registration failed:', error);
-      });
-  });
+
+  // Registered immediately (not on window.load) so Chrome sees an active worker
+  // with a fetch handler as early as possible and can fire beforeinstallprompt.
+  navigator.serviceWorker
+    .register('sw.js', { scope: './' })
+    .then((registration) => {
+      registration.update();
+
+      if (!navigator.serviceWorker.controller) {
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          refreshInstallUi();
+        });
+      }
+
+      return registration;
+    })
+    .then(() => {
+      refreshInstallUi();
+      showInstallBannerIfWeb();
+    })
+    .catch((error) => {
+      console.error('Service worker registration failed:', error);
+    });
 }
 
 function initInstallPrompt() {
+  refreshInstallUi();
+
   window.addEventListener('beforeinstallprompt', (event) => {
     event.preventDefault();
     state.deferredInstallPrompt = event;
-    ui.installSettingItem.hidden = false;
-    ui.installSettingText.textContent = 'Install App';
+    refreshInstallUi();
     showInstallBannerIfWeb();
   });
 
   window.addEventListener('appinstalled', () => {
     state.deferredInstallPrompt = null;
+    localStorage.setItem(INSTALL_DISMISSED_KEY, '1');
     ui.installBanner.hidden = true;
     ui.installSettingItem.hidden = true;
     showToast('App installed. Find RPG Todo on your home screen.', 'success');
   });
+}
 
-  if (isIosSafari() && !window.navigator.standalone) {
-    ui.installSettingItem.hidden = false;
-    ui.installSettingText.textContent = 'How to Install';
+function refreshInstallUi() {
+  if (isNativePlatform() || isStandalone()) {
+    ui.installSettingItem.hidden = true;
+    ui.installBanner.hidden = true;
+    return;
   }
+
+  ui.installSettingItem.hidden = false;
+  ui.installSettingText.textContent = state.deferredInstallPrompt ? 'Install App' : 'How to Install';
 }
 
 function showInstallBannerIfWeb() {
-  const dismissed = localStorage.getItem('rpgTodoInstallDismissed');
+  const dismissed = localStorage.getItem(INSTALL_DISMISSED_KEY);
   if (dismissed !== '1' && !isNativePlatform() && !isStandalone()) {
     ui.installBanner.hidden = false;
   }
 }
 
+function dismissInstallBanner() {
+  localStorage.setItem(INSTALL_DISMISSED_KEY, '1');
+  ui.installBanner.hidden = true;
+}
+
 async function handleInstallClick() {
   if (state.deferredInstallPrompt) {
     state.deferredInstallPrompt.prompt();
-    await state.deferredInstallPrompt.userChoice;
+    const choice = await state.deferredInstallPrompt.userChoice;
     state.deferredInstallPrompt = null;
+    if (choice && choice.outcome === 'accepted') {
+      return;
+    }
     ui.installBanner.hidden = true;
-    ui.installSettingItem.hidden = true;
+    refreshInstallUi();
     return;
   }
 
-  if (isIosSafari() && !isStandalone()) {
+  showInstallInstructions();
+}
+
+function showInstallInstructions() {
+  if (isStandalone()) {
+    showToast('RPG Todo is already installed and running as an app.', 'neutral');
+    return;
+  }
+
+  if (isIosSafari()) {
     showConfirmDialog(
       'Install on iPhone/iPad',
       'Tap the Share button (square with arrow), then choose "Add to Home Screen". RPG Todo will appear like a native app on your home screen.'
@@ -1265,7 +1303,25 @@ async function handleInstallClick() {
     return;
   }
 
-  showToast('Install is available from your browser\u2019s menu (Add to Home Screen).', 'neutral');
+  if (isAndroidBrowser()) {
+    showConfirmDialog(
+      'Install on Android',
+      'Tap the three-dot menu at the top right of Chrome, then choose "Install app" or "Add to Home screen". RPG Todo opens full screen like a normal app and works offline.'
+    );
+    return;
+  }
+
+  showConfirmDialog(
+    'Install RPG Todo',
+    'Open this page in Chrome on Android or Safari on iPhone, then use the browser menu and choose "Install app" or "Add to Home Screen".'
+  );
+}
+
+function handleLaunchParams() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('action') === 'add') {
+    openTaskModal();
+  }
 }
 
 function initNativeBridge() {
@@ -1326,6 +1382,10 @@ function isIosSafari() {
   const isIPhone = /iphone|ipad|ipod/.test(ua);
   const isSafari = ua.includes('safari') && !ua.includes('crios') && !ua.includes('fxios');
   return isIPhone && isSafari;
+}
+
+function isAndroidBrowser() {
+  return /android/.test(navigator.userAgent.toLowerCase());
 }
 
 function isStandalone() {

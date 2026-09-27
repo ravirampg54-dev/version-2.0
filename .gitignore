@@ -4,3 +4,9 @@ node_modules/
 **/build/
 .idea/
 *.iml
+.env
+.env.*
+!.env.example
+dist/
+.vercel/
+

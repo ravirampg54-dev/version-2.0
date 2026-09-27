@@ -1,11 +1,13 @@
-const CACHE_VERSION = 'v3';
+const CACHE_VERSION = 'v4';
 const CACHE_PREFIX = 'rpg-todo';
 const STATIC_CACHE = `${CACHE_PREFIX}-static-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `${CACHE_PREFIX}-runtime-${CACHE_VERSION}`;
 
+const APP_SHELL = './index.html';
+
 const STATIC_ASSETS = [
   './',
-  './index.html',
+  APP_SHELL,
   './manifest.json',
   './style.css',
   './app.js',
@@ -21,18 +23,25 @@ const STATIC_ASSETS = [
   './assets/icon-maskable-512.png',
 ];
 
-const isStaticAsset = (url) =>
-  url.origin === self.location.origin && STATIC_ASSETS.some((asset) => new URL(asset, self.location.origin).href === url.href);
+const staticAssetUrls = STATIC_ASSETS.map((asset) => new URL(asset, self.location.href).href);
+
+const isStaticAsset = (url) => staticAssetUrls.includes(url.href);
+
+const putInCache = (cacheName, request, response) =>
+  caches.open(cacheName).then((cache) => cache.put(request, response));
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(STATIC_CACHE)
-      .then((cache) => cache.addAll(STATIC_ASSETS))
-      .catch((error) => {
-        // A failed prefetch (e.g. offline first install) must not break the install.
-        void error;
-      })
+      .then((cache) =>
+        Promise.all(
+          STATIC_ASSETS.map((asset) =>
+            // cache: 'reload' bypasses the HTTP cache so a stale CDN copy never poisons the app shell.
+            cache.add(new Request(asset, { cache: 'reload' })).catch(() => undefined)
+          )
+        )
+      )
       .then(() => self.skipWaiting())
   );
 });
@@ -52,7 +61,13 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Cache-first for static assets, stale-while-revalidate for everything else
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
+// Cache-first for precached assets, stale-while-revalidate for the rest
 // (this app has no remote API; "dynamic" requests fall back to network then cache).
 self.addEventListener('fetch', (event) => {
   const request = event.request;
@@ -66,31 +81,37 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Navigations: network-first, falling back to the cached app shell.
+  // Navigations: network-first, falling back to the cached app shell so the
+  // installed app opens with no connection (start_url carries a query string).
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
         .then((response) => {
           if (response && response.ok) {
             const clone = response.clone();
-            caches.open(STATIC_CACHE).then((cache) => cache.put('./index.html', clone));
+            void putInCache(STATIC_CACHE, APP_SHELL, clone);
             return response;
           }
           throw new Error('navigation failed');
         })
-        .catch(() => caches.match('./index.html'))
+        .catch(() =>
+          caches
+            .match(APP_SHELL)
+            .then((cached) => cached || caches.match('./'))
+            .then((cached) => cached || Response.error())
+        )
     );
     return;
   }
 
   // Same-origin GET: cache-first with background refresh (stale-while-revalidate).
   event.respondWith(
-    caches.match(request).then((cached) => {
+    caches.match(request, { ignoreSearch: true }).then((cached) => {
       const networkUpdate = fetch(request)
         .then((response) => {
           if (response && response.ok && response.type === 'basic') {
             const clone = response.clone();
-            caches.open(isStaticAsset(url) ? STATIC_CACHE : RUNTIME_CACHE).then((cache) => cache.put(request, clone));
+            void putInCache(isStaticAsset(url) ? STATIC_CACHE : RUNTIME_CACHE, request, clone);
           }
           return response;
         })
