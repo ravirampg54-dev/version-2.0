@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Reminder and alarm scheduling -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Exact alarms: SCHEDULE_EXACT_ALARM applies on Android 12-12L, USE_EXACT_ALARM from 13. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -27,6 +37,41 @@
             android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- Fires one reminder occurrence, posts the notification, and arms the next one. -->
+        <receiver
+            android:name=".alarm.AlarmReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.rpgtodo.app.action.FIRE_ALARM" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Open / Complete / Snooze / Turn off buttons on the notification. -->
+        <receiver
+            android:name=".alarm.AlarmActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.rpgtodo.app.action.OPEN_TASK" />
+                <action android:name="com.rpgtodo.app.action.COMPLETE_TASK" />
+                <action android:name="com.rpgtodo.app.action.SNOOZE_TASK" />
+                <action android:name="com.rpgtodo.app.action.TURN_OFF_REMINDERS" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Rebuilds the schedule after reboot, app update, or a time-zone / clock change. -->
+        <receiver
+            android:name=".alarm.AlarmBootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.TIME_SET" />
+            </intent-filter>
+        </receiver>
     </application>
 
     <!-- Permissions -->

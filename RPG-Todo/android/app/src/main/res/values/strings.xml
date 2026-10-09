@@ -4,4 +4,24 @@
     <string name="title_activity_main">RPG Todo</string>
     <string name="package_name">com.rpgtodo.app</string>
     <string name="custom_url_scheme">com.rpgtodo.app</string>
+
+    <!-- Notification channels -->
+    <string name="channel_reminders_name">Task reminders</string>
+    <string name="channel_reminders_description">Standard notifications for quest reminders.</string>
+    <string name="channel_reminders_silent_name">Task reminders (silent)</string>
+    <string name="channel_reminders_silent_description">Reminders that appear without any sound.</string>
+    <string name="channel_alarms_name">Quest alarms</string>
+    <string name="channel_alarms_description">Alarm-style reminders that ring at alarm volume and can bypass Do Not Disturb.</string>
+    <string name="channel_alarms_silent_name">Quest alarms (silent)</string>
+    <string name="channel_alarms_silent_description">Alarm reminders with heads-up display but no sound.</string>
+
+    <!-- Notification content -->
+    <string name="notification_default_body">Reminder scheduled for %1$s</string>
+    <string name="notification_subtext_snoozed">Scheduled %1$s · snoozed %2$d min</string>
+
+    <!-- Notification actions -->
+    <string name="action_open_task">Open Task</string>
+    <string name="action_complete">Complete</string>
+    <string name="action_snooze">Snooze %1$d min</string>
+    <string name="action_turn_off">Turn off</string>
 </resources>

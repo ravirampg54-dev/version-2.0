@@ -50,10 +50,16 @@ jobs:
       - name: Create or update Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.0
-          name: RPG Todo v1.0.0
+          tag_name: v2.0.0
+          name: RPG Todo v2.0.0
           body: |
             Installable Android APK built automatically from commit `${{ github.sha }}`.
+
+            ## What's new in v2.0
+            - 📝 Notes collection
+            - ⏱️ Countdown timer &amp; stopwatch
+            - ⏰ Recurring alarms with sound, snooze and vibration
+            - 🔔 Notifications and alarm permissions
 
             ## Install
             1. Open this release on your Android phone.

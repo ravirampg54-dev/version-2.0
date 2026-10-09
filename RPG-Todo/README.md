@@ -4,12 +4,22 @@ RPG Todo is a mobile-first productivity app built with HTML5, CSS3, and vanilla 
 
 ## Features
 
+### v2.0
+
+- 📝 **Notes collection** — quickly capture notes with a title, body, color, and pin, with search and filters
+- ⏱️ **Timer & stopwatch** — countdown presets (Focus/Break/Deep), custom durations with a progress ring, and a stopwatch with laps
+- ⏰ **Alarms** — recurring or one-time alarms with repeat rules, alarm/chime/silent sounds, snooze, and vibration
+- 🔔 **Notifications** — local reminder notifications plus native Android alarm notifications with actions
+- 🔊 **Sound** — Web Audio alarm/timer tones with adjustable volume and tone, no asset files required
+
+### Core
+
 - Offline-first task management with LocalStorage
 - Dashboard summaries with streak tracking
 - Add, edit, complete, uncomplete, delete, and view task details
 - Search, filters, and sorting
 - Theme center with multiple appearance modes
-- Android-ready Capacitor setup
+- Android-ready Capacitor setup with native alarms
 - Mobile-first design with safe-area support
 
 ## Run locally

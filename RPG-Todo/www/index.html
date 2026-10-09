@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="theme-color" content="#6C63FF" />
-    <meta name="description" content="RPG Todo - offline productivity app for study, work, and daily quests." />
+    <meta name="description" content="RPG Todo - offline productivity app for tasks, notes, timers, alarms, study, work, and daily quests." />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -23,7 +23,7 @@
         <div class="brand-block">
           <div class="brand-icon">✓</div>
           <div class="brand-copy">
-            <span class="eyebrow">Quest Log</span>
+            <span class="eyebrow">Quest Log · v2</span>
             <h1>RPG Todo</h1>
           </div>
         </div>
@@ -83,6 +83,24 @@
             <div id="streakBadge" class="streak-badge">🔥 0 Day Streak</div>
           </div>
 
+          <div class="quick-actions-grid">
+            <button class="quick-action" type="button" data-quick-target="note">
+              <span>📝</span>
+              <strong>Notes</strong>
+              <small id="homeNoteCount">0 saved</small>
+            </button>
+            <button class="quick-action" type="button" data-quick-target="timer">
+              <span>⏱️</span>
+              <strong>Timer</strong>
+              <small>Focus &amp; stopwatch</small>
+            </button>
+            <button class="quick-action" type="button" data-quick-target="alarm">
+              <span>⏰</span>
+              <strong>Alarms</strong>
+              <small id="homeAlarmCount">0 set</small>
+            </button>
+          </div>
+
           <div class="panel-block">
             <div class="panel-heading">
               <h3>Today's Tasks</h3>
@@ -120,6 +138,90 @@
           <div id="taskList" class="task-list"></div>
         </section>
 
+        <section id="notesView" class="screen">
+          <div class="toolbar-box">
+            <div class="search-box">
+              <span>🔍</span>
+              <input id="noteSearchInput" type="search" placeholder="Search notes..." aria-label="Search notes" />
+            </div>
+          </div>
+
+          <div id="noteFilterTabs" class="filter-tabs" role="tablist" aria-label="Note filters">
+            <button class="filter-chip active" data-note-filter="all" type="button" aria-pressed="true">All</button>
+            <button class="filter-chip" data-note-filter="pinned" type="button" aria-pressed="false">📌 Pinned</button>
+            <button class="filter-chip" data-note-filter="recent" type="button" aria-pressed="false">Recent</button>
+          </div>
+
+          <div id="noteList" class="notes-grid"></div>
+        </section>
+
+        <section id="timerView" class="screen">
+          <div class="mode-tabs" role="tablist" aria-label="Timer mode">
+            <button class="mode-tab active" data-timer-mode="countdown" type="button" aria-pressed="true">Countdown</button>
+            <button class="mode-tab" data-timer-mode="stopwatch" type="button" aria-pressed="false">Stopwatch</button>
+          </div>
+
+          <div id="countdownPane" class="panel-block timer-panel">
+            <div class="timer-ring-wrap">
+              <svg class="timer-ring" viewBox="0 0 220 220" aria-hidden="true">
+                <circle class="timer-ring-track" cx="110" cy="110" r="100"></circle>
+                <circle id="timerRingProgress" class="timer-ring-progress" cx="110" cy="110" r="100"></circle>
+              </svg>
+              <div class="timer-display">
+                <strong id="timerDisplay">25:00</strong>
+                <span id="timerStatusLabel">Ready</span>
+              </div>
+            </div>
+
+            <div id="timerPresets" class="timer-presets">
+              <button class="preset-chip active" data-minutes="25" type="button">Focus 25</button>
+              <button class="preset-chip" data-minutes="5" type="button">Break 5</button>
+              <button class="preset-chip" data-minutes="15" type="button">Break 15</button>
+              <button class="preset-chip" data-minutes="45" type="button">Deep 45</button>
+            </div>
+
+            <div class="field-row two-col timer-custom">
+              <div class="field-group">
+                <label for="timerMinutes">Minutes</label>
+                <input id="timerMinutes" type="number" min="0" max="180" value="25" />
+              </div>
+              <div class="field-group">
+                <label for="timerSeconds">Seconds</label>
+                <input id="timerSeconds" type="number" min="0" max="59" value="0" />
+              </div>
+            </div>
+
+            <div class="timer-controls">
+              <button id="timerStartBtn" class="primary-btn" type="button">Start</button>
+              <button id="timerResetBtn" class="secondary-btn" type="button">Reset</button>
+            </div>
+          </div>
+
+          <div id="stopwatchPane" class="panel-block timer-panel" hidden>
+            <div class="stopwatch-display" id="stopwatchDisplay">00:00.0</div>
+            <div class="timer-controls">
+              <button id="stopwatchStartBtn" class="primary-btn" type="button">Start</button>
+              <button id="stopwatchLapBtn" class="secondary-btn" type="button">Lap</button>
+              <button id="stopwatchResetBtn" class="secondary-btn" type="button">Reset</button>
+            </div>
+            <div id="lapsList" class="laps-list"></div>
+          </div>
+        </section>
+
+        <section id="alarmsView" class="screen">
+          <div class="alarm-header">
+            <div class="alarm-header-copy">
+              <h3>Quest Alarms</h3>
+              <span id="alarmSubtitle">Ring even when the app is closed</span>
+            </div>
+            <button id="newAlarmButton" class="primary-btn compact" type="button">+ New</button>
+          </div>
+
+          <p id="alarmPermissionNote" class="notice-text" hidden></p>
+
+          <div id="alarmList" class="alarm-list"></div>
+        </section>
+
         <section id="completedView" class="screen">
           <div class="panel-block top-space">
             <div class="panel-heading">
@@ -144,6 +246,14 @@
               <span>Notifications</span>
               <strong>Reminder Settings</strong>
             </button>
+            <button class="settings-item" type="button" data-settings-action="alarm-settings">
+              <span>Alarms</span>
+              <strong>Alarm &amp; Permission Settings</strong>
+            </button>
+            <button class="settings-item" type="button" data-settings-action="sound-settings">
+              <span>Sound</span>
+              <strong>Sound &amp; Volume</strong>
+            </button>
             <button class="settings-item" type="button" data-settings-action="default-priority">
               <span>Tasks</span>
               <strong>Default Priority</strong>
@@ -152,17 +262,21 @@
               <span>Tasks</span>
               <strong>Default Category</strong>
             </button>
-            <button class="settings-item" type="button" data-settings-action="export-tasks">
-              <span>Data</span>
-              <strong>Export Tasks</strong>
+            <button class="settings-item" type="button" data-settings-action="completed-quests">
+              <span>Tasks</span>
+              <strong>Completed Quest Log</strong>
             </button>
-            <button class="settings-item" type="button" data-settings-action="import-tasks">
+            <button class="settings-item" type="button" data-settings-action="export-data">
               <span>Data</span>
-              <strong>Import Tasks</strong>
+              <strong>Export Backup</strong>
             </button>
-            <button class="settings-item danger" type="button" data-settings-action="clear-tasks">
+            <button class="settings-item" type="button" data-settings-action="import-data">
               <span>Data</span>
-              <strong>Clear All Tasks</strong>
+              <strong>Import Backup</strong>
+            </button>
+            <button class="settings-item danger" type="button" data-settings-action="clear-data">
+              <span>Data</span>
+              <strong>Clear All Data</strong>
             </button>
             <button class="settings-item" type="button" data-settings-action="app-version">
               <span>About</span>
@@ -178,6 +292,8 @@
         </section>
       </main>
 
+      <button id="quickAddButton" class="fab" type="button" aria-label="Create new item">＋</button>
+
       <nav class="bottom-nav" aria-label="Main navigation">
         <button class="nav-item active" data-nav="home" type="button" aria-current="page">
           <span>🏠</span>
@@ -187,19 +303,46 @@
           <span>📋</span>
           <small>Tasks</small>
         </button>
-        <button class="nav-item add-button" data-nav="add" type="button" aria-label="Add task">
-          <span>➕</span>
-          <small>Add</small>
+        <button class="nav-item" data-nav="notes" type="button" aria-current="false">
+          <span>📝</span>
+          <small>Notes</small>
         </button>
-        <button class="nav-item" data-nav="completed" type="button" aria-current="false">
-          <span>✅</span>
-          <small>Completed</small>
+        <button class="nav-item" data-nav="timer" type="button" aria-current="false">
+          <span>⏱️</span>
+          <small>Timer</small>
+        </button>
+        <button class="nav-item" data-nav="alarms" type="button" aria-current="false">
+          <span>⏰</span>
+          <small>Alarms</small>
         </button>
         <button class="nav-item" data-nav="settings" type="button" aria-current="false">
           <span>⚙️</span>
           <small>Settings</small>
         </button>
       </nav>
+    </div>
+
+    <div id="quickAddModal" class="modal hidden" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="quickAddTitle">
+      <div class="modal-card quick-add-card">
+        <div class="modal-header">
+          <h3 id="quickAddTitle">Create New</h3>
+          <button class="icon-button" type="button" data-close-modal="quickAddModal" aria-label="Close create menu">✕</button>
+        </div>
+        <div class="quick-add-options">
+          <button class="quick-add-option" type="button" data-create="task">
+            <span class="quick-add-emoji">📋</span>
+            <div><strong>Task</strong><small>Add a quest to your list</small></div>
+          </button>
+          <button class="quick-add-option" type="button" data-create="note">
+            <span class="quick-add-emoji">📝</span>
+            <div><strong>Note</strong><small>Capture an idea or reminder</small></div>
+          </button>
+          <button class="quick-add-option" type="button" data-create="alarm">
+            <span class="quick-add-emoji">⏰</span>
+            <div><strong>Alarm</strong><small>Ring at a chosen time</small></div>
+          </button>
+        </div>
+      </div>
     </div>
 
     <div id="taskModal" class="modal hidden" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="taskModalTitle">
@@ -271,6 +414,123 @@
       </div>
     </div>
 
+    <div id="noteModal" class="modal hidden" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="noteModalTitle">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 id="noteModalTitle">New Note</h3>
+          <button class="icon-button" type="button" data-close-modal="noteModal" aria-label="Close note modal">✕</button>
+        </div>
+
+        <form id="noteForm">
+          <input type="hidden" id="noteId" />
+
+          <div class="field-group">
+            <label for="noteTitle">Title</label>
+            <input id="noteTitle" type="text" maxlength="120" placeholder="Note title" autocomplete="off" />
+          </div>
+
+          <div class="field-group">
+            <label for="noteBody">Note</label>
+            <textarea id="noteBody" rows="7" placeholder="Write anything..."></textarea>
+            <span id="noteError" class="field-error" role="alert" hidden></span>
+          </div>
+
+          <div class="field-group">
+            <label>Color</label>
+            <div id="noteColorPalette" class="color-palette"></div>
+          </div>
+
+          <div class="toggle-row">
+            <label for="notePinned">📌 Pin to top</label>
+            <label class="switch">
+              <input id="notePinned" type="checkbox" />
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="danger-btn primary-btn" id="deleteNoteButton" hidden>Delete</button>
+            <button type="button" class="secondary-btn" data-close-modal="noteModal">Cancel</button>
+            <button type="submit" class="primary-btn">Save Note</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="alarmModal" class="modal hidden" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="alarmModalTitle">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 id="alarmModalTitle">New Alarm</h3>
+          <button class="icon-button" type="button" data-close-modal="alarmModal" aria-label="Close alarm modal">✕</button>
+        </div>
+
+        <form id="alarmForm">
+          <input type="hidden" id="alarmId" />
+
+          <div class="field-group">
+            <label for="alarmTime">Time</label>
+            <input id="alarmTime" type="time" value="07:00" required />
+          </div>
+
+          <div class="field-group">
+            <label for="alarmLabel">Label</label>
+            <input id="alarmLabel" type="text" maxlength="80" placeholder="Wake up / Study block" autocomplete="off" />
+          </div>
+
+          <div class="field-group">
+            <label for="alarmRepeat">Repeat</label>
+            <select id="alarmRepeat">
+              <option value="never">Once</option>
+              <option value="daily">Every day</option>
+              <option value="weekdays">Weekdays (Mon–Fri)</option>
+              <option value="weekly">Weekly</option>
+              <option value="custom">Custom days</option>
+            </select>
+          </div>
+
+          <div class="field-group" id="alarmDaysField" hidden>
+            <label>Days</label>
+            <div id="alarmDaysPicker" class="day-picker"></div>
+          </div>
+
+          <div class="field-row two-col">
+            <div class="field-group">
+              <label for="alarmSound">Sound</label>
+              <select id="alarmSound">
+                <option value="alarm">Alarm tone</option>
+                <option value="notification">Notification</option>
+                <option value="silent">Silent</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label for="alarmSnooze">Snooze</label>
+              <select id="alarmSnooze">
+                <option value="5">5 minutes</option>
+                <option value="10" selected>10 minutes</option>
+                <option value="15">15 minutes</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="toggle-row">
+            <label for="alarmVibration">Vibrate</label>
+            <label class="switch">
+              <input id="alarmVibration" type="checkbox" checked />
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <p id="alarmNotice" class="notice-text"></p>
+
+          <div class="modal-actions">
+            <button type="button" class="secondary-btn" id="previewAlarmSound">🔊 Preview</button>
+            <button type="button" class="danger-btn primary-btn" id="deleteAlarmButton" hidden>Delete</button>
+            <button type="submit" class="primary-btn">Save Alarm</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <div id="detailsModal" class="modal hidden" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="detailsModalTitle">
       <div class="modal-card details-card">
         <div class="modal-header">
@@ -291,6 +551,18 @@
         <div class="modal-actions">
           <button type="button" class="secondary-btn" data-close-modal="confirmModal">Cancel</button>
           <button type="button" class="primary-btn danger-btn" id="confirmModalAccept">Confirm</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="ringingOverlay" class="ringing-overlay" hidden aria-live="assertive">
+      <div class="ringing-card">
+        <div class="ringing-emoji">⏰</div>
+        <h3 id="ringingTitle">Alarm</h3>
+        <p id="ringingTime" class="ringing-time"></p>
+        <div class="ringing-actions">
+          <button id="ringingSnooze" class="secondary-btn" type="button">Snooze</button>
+          <button id="ringingStop" class="primary-btn" type="button">Stop</button>
         </div>
       </div>
     </div>

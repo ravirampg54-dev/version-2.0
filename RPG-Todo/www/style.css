@@ -770,9 +770,9 @@ button {
   backdrop-filter: blur(14px);
   border-top: 1px solid var(--border);
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 4px;
-  padding: max(10px, env(safe-area-inset-bottom)) 14px calc(12px + env(safe-area-inset-bottom));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 2px;
+  padding: max(10px, env(safe-area-inset-bottom)) 8px calc(12px + env(safe-area-inset-bottom));
   z-index: 20;
   box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.08);
 }
@@ -1166,6 +1166,527 @@ textarea:focus-visible,
   outline-offset: 2px;
 }
 
+/* ============================================================
+   v2.0 — Notes, Timer, Alarms, Sounds, FAB
+   ============================================================ */
+
+/* Floating add button */
+.fab {
+  position: fixed;
+  right: 18px;
+  bottom: calc(84px + env(safe-area-inset-bottom));
+  width: 58px;
+  height: 58px;
+  border: none;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), var(--primary-strong));
+  color: #fff;
+  font-size: 1.7rem;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 14px 30px rgba(108, 99, 255, 0.38);
+  z-index: 25;
+  transition: transform 0.15s ease;
+}
+
+.fab:active {
+  transform: scale(0.94);
+}
+
+/* Quick actions on the dashboard */
+.quick-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.quick-action {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 14px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: 0 10px 25px var(--shadow);
+  color: var(--text);
+  text-align: left;
+}
+
+.quick-action span {
+  font-size: 1.4rem;
+}
+
+.quick-action strong {
+  font-size: 0.92rem;
+}
+
+.quick-action small {
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+}
+
+/* Quick-add chooser */
+.quick-add-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.quick-add-option {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface-soft);
+  color: var(--text);
+  text-align: left;
+}
+
+.quick-add-option strong {
+  display: block;
+  font-size: 0.98rem;
+}
+
+.quick-add-option small {
+  color: var(--text-secondary);
+}
+
+.quick-add-emoji {
+  font-size: 1.5rem;
+}
+
+/* Notes grid */
+.notes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.note-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 130px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: 0 10px 25px var(--shadow);
+  color: #1a2333;
+  text-align: left;
+  overflow: hidden;
+}
+
+.note-card .note-card-body,
+.note-card .note-card-meta {
+  color: #43506b;
+}
+
+.note-pin-badge {
+  border: none;
+  background: transparent;
+  padding: 0 2px;
+  font-size: 1rem;
+  line-height: 1;
+  color: inherit;
+}
+
+.link-btn {
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: var(--primary-strong);
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.primary-btn.danger-btn {
+  background: var(--danger);
+}
+
+.note-card.pinned {
+  border-color: var(--primary);
+}
+
+.note-card-title {
+  font-size: 0.98rem;
+  font-weight: 700;
+  word-break: break-word;
+}
+
+.note-card-body {
+  flex: 1;
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+}
+
+.note-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.note-pin-badge {
+  font-size: 0.9rem;
+}
+
+.note-palette-swatch {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+}
+
+.color-palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.color-swatch {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  padding: 0;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.color-swatch.selected {
+  transform: scale(1.1);
+  box-shadow: 0 0 0 3px var(--primary-soft), 0 0 0 2px var(--primary);
+}
+
+/* Mode tabs (timer) */
+.mode-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 6px;
+  margin-bottom: 16px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+
+.mode-tab {
+  flex: 1;
+  min-height: 44px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+.mode-tab.active {
+  background: var(--primary);
+  color: #fff;
+}
+
+/* Timer */
+.timer-panel {
+  text-align: center;
+}
+
+.timer-ring-wrap {
+  position: relative;
+  width: min(240px, 72vw);
+  margin: 8px auto 18px;
+  aspect-ratio: 1;
+}
+
+.timer-ring {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.timer-ring-track {
+  fill: none;
+  stroke: var(--surface-secondary);
+  stroke-width: 12;
+}
+
+.timer-ring-progress {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 12;
+  stroke-linecap: round;
+  stroke-dasharray: 628.32;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 0.3s linear, stroke 0.3s ease;
+}
+
+.timer-ring-wrap.running .timer-ring-progress {
+  stroke: var(--success);
+}
+
+.timer-ring-wrap.finished .timer-ring-progress {
+  stroke: var(--danger);
+}
+
+.timer-display {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.timer-display strong {
+  font-size: clamp(2.2rem, 10vw, 3rem);
+  font-variant-numeric: tabular-nums;
+}
+
+.timer-display span {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.timer-presets {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.preset-chip {
+  border: 1px solid var(--border);
+  background: var(--surface-soft);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  padding: 9px 14px;
+  font-weight: 600;
+  font-size: 0.82rem;
+}
+
+.preset-chip.active {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  color: var(--primary-strong);
+}
+
+.timer-custom {
+  text-align: left;
+}
+
+.timer-controls {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.stopwatch-display {
+  font-size: clamp(2.4rem, 12vw, 3.4rem);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  margin: 18px 0;
+}
+
+.laps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+  text-align: left;
+}
+
+.lap-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-soft);
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Alarms */
+.alarm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.alarm-header-copy h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.alarm-header-copy span {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+
+.alarm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.alarm-card {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: 0 10px 25px var(--shadow);
+}
+
+.alarm-card.disabled {
+  opacity: 0.55;
+}
+
+.alarm-card-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.alarm-time {
+  font-size: 1.9rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.alarm-label {
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+  margin-top: 2px;
+}
+
+.alarm-repeat {
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+  margin-top: 4px;
+}
+
+.alarm-next {
+  color: var(--primary-strong);
+  font-size: 0.74rem;
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+.alarm-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.day-picker {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.day-chip {
+  flex: 1;
+  min-width: 0;
+  min-height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-soft);
+  color: var(--text-secondary);
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+
+.day-chip.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+/* Ringing overlay */
+.ringing-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.ringing-overlay[hidden] {
+  display: none;
+}
+
+.ringing-card {
+  width: min(100%, 360px);
+  padding: 28px 22px;
+  border-radius: 26px;
+  background: var(--surface);
+  text-align: center;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+}
+
+.ringing-emoji {
+  font-size: 3rem;
+  animation: ringShake 0.6s ease-in-out infinite;
+}
+
+.ringing-card h3 {
+  margin: 12px 0 4px;
+  font-size: 1.3rem;
+}
+
+.ringing-time {
+  color: var(--text-secondary);
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+  margin: 0 0 20px;
+}
+
+.ringing-actions {
+  display: flex;
+  gap: 10px;
+}
+
+@keyframes ringShake {
+  0%, 100% { transform: rotate(-12deg); }
+  50% { transform: rotate(12deg); }
+}
+
+@media (min-width: 640px) {
+  .notes-grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  }
+}
+
+@media (max-width: 380px) {
+  .quick-actions-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (orientation: landscape) and (max-height: 500px) {
   body {
     padding-left: 24px;
@@ -1187,7 +1708,7 @@ textarea:focus-visible,
   }
 
   .bottom-nav {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 2px;
     padding-top: 6px;
     padding-bottom: calc(6px + env(safe-area-inset-bottom));

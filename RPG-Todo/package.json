@@ -1,8 +1,8 @@
 {
   "name": "rpg-todo",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "RPG Todo offline productivity app built with HTML, CSS, JavaScript, and Capacitor.",
+  "description": "RPG Todo offline productivity app with tasks, notes, timer, alarms, and notifications, built with HTML, CSS, JavaScript, and Capacitor.",
   "scripts": {
     "start": "npx serve -s www -l 8080",
     "dev": "npx serve -s www -l 8080",

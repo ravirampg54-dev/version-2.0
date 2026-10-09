@@ -2,7 +2,7 @@
   "id": "./",
   "name": "RPG Todo",
   "short_name": "RPG Todo",
-  "description": "RPG Todo - offline productivity for study, work, and daily quests.",
+  "description": "RPG Todo - offline productivity with tasks, notes, timer, alarms, and daily quests.",
   "lang": "en",
   "dir": "ltr",
   "start_url": "./?source=pwa",
@@ -30,6 +30,20 @@
       "short_name": "Add",
       "description": "Create a new quest",
       "url": "./?source=shortcut&action=add",
+      "icons": [{ "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "New Note",
+      "short_name": "Note",
+      "description": "Write a new note",
+      "url": "./?source=shortcut&action=note",
+      "icons": [{ "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "New Alarm",
+      "short_name": "Alarm",
+      "description": "Set a new alarm",
+      "url": "./?source=shortcut&action=alarm",
       "icons": [{ "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     }
   ],
