@@ -7,6 +7,7 @@
     "start": "npx serve -s www -l 8080",
     "dev": "npx serve -s www -l 8080",
     "build": "npx cap sync android",
+    "build:web": "node scripts/build-web.js",
     "cap:sync": "npx cap sync android",
     "cap:open": "npx cap open android",
     "android:generate": "npx @capacitor/assets generate --android"
